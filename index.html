@@ -468,273 +468,456 @@
   <div id="toasts" aria-live="polite"></div>
 
   <script>
-    const APPS_SCRIPT_URL = "YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL";
-    const SOUND_FILES = { select: "", submit: "" };
-    // Put each picture path/link here (one per card):
-    // Example: "images/picture1.jpg" or "C:/Users/msi/Desktop/Past/images/picture1.jpg"
-    const WRITING_IMAGE_SOURCES =
-     ["asset/1.png", 
-     "asset/2.png",
-     "asset/3.png",
-     "asset/4.png",
-     "asset/5.png",
-     "asset/6.png",
-    ]
+  const APPS_SCRIPT_URL = "PASTE_YOUR_DEPLOYED_APPS_SCRIPT_EXEC_URL_HERE";
 
-    const QUESTIONS = [
-      { text: "She ___ (listen) to music when her mother ___ (came)home.", options: ["was listening / came", "was listening / was coming", "listened / came"], answer: 0 },
-      { text: "They ___ (have) dinner when the lights ___ (go)out.", options: ["were having / went", "had / went", "were having / were going"], answer: 0 },
-      { text: "I ___ (meet) my best friend yesterday.", options: ["met", "was meeting"], answer: 0 },
-      { text: "While I ___ (do) my homework, my brother ___ (paly) video games.", options: ["was doing / was playing", "did / was playing", "was doing / played"], answer: 0 },
-      { text: "The children ___ (run) in the park while their parents ___ (talk).", options: ["were running / were talking", "ran / were talking", "were running / talked"], answer: 0 },
-      { text: "We ___ (wait) for the bus when it ___ (start) to rain.", options: ["were waiting / started", "waited / started", "were waiting / was starting"], answer: 0 },
-      { text: "He ___ (sleep )when the alarm ___(ring).", options: ["was sleeping / rang", "slept / rang", "was sleeping / was ringing"], answer: 0 },
-      { text: "I ___ (watch) TV while my sister ___ (read) a book.", options: ["was watching / was reading", "watched / read", "was watching / read"], answer: 0 },
-      { text: "They ___ (walk) home when they ___ (see)a dog.", options: ["were walking / saw", "walked / saw", "were walking / were seeing"], answer: 0 },
-      { text: "While the teacher ___ (explain) the lesson, the students ___  (take)notes.", options: ["was explaining / were taking", "explained / took", "was explaining / took"], answer: 0 }
-    ];
+  const SOUND_FILES = { select: "", submit: "" };
 
-    const WRITING_CARDS = [
-      { id: "ex1", prompt: "playing a game / your mom call you", sample: "I was playing a game with my friends when my mom called me for dinner.", editable: false },
-      { id: "w2", prompt: "walking in the park / birds sing", editable: true },
-      { id: "w3", prompt: "cleaning the house / guests arrive", editable: true },
-      { id: "w4", prompt: "driving to work / the car break down", editable: true },
-      { id: "w5", prompt: "cleaning the house / your mother cook", editable: true },
-      { id: "w6", prompt: "studying for a test / your friend send a message", editable: true }
-    ];
+  const WRITING_IMAGE_SOURCES = [
+    "asset/1.png",
+    "asset/2.png",
+    "asset/3.png",
+    "asset/4.png",
+    "asset/5.png",
+    "asset/6.png"
+  ];
 
-    const state = { selected: Array(QUESTIONS.length).fill(null), answered: 0, score: 0, submitted: false };
-    let audioCtxRef;
+  const QUESTIONS = [
+    { text: "She ___ (listen) to music when her mother ___ (came) home.", options: ["was listening / came", "was listening / was coming", "listened / came"], answer: 0 },
+    { text: "They ___ (have) dinner when the lights ___ (go) out.", options: ["were having / went", "had / went", "were having / were going"], answer: 0 },
+    { text: "I ___ (meet) my best friend yesterday.", options: ["met", "was meeting"], answer: 0 },
+    { text: "While I ___ (do) my homework, my brother ___ (play) video games.", options: ["was doing / was playing", "did / was playing", "was doing / played"], answer: 0 },
+    { text: "The children ___ (run) in the park while their parents ___ (talk).", options: ["were running / were talking", "ran / were talking", "were running / talked"], answer: 0 },
+    { text: "We ___ (wait) for the bus when it ___ (start) to rain.", options: ["were waiting / started", "waited / started", "were waiting / was starting"], answer: 0 },
+    { text: "He ___ (sleep) when the alarm ___ (ring).", options: ["was sleeping / rang", "slept / rang", "was sleeping / was ringing"], answer: 0 },
+    { text: "I ___ (watch) TV while my sister ___ (read) a book.", options: ["was watching / was reading", "watched / read", "was watching / read"], answer: 0 },
+    { text: "They ___ (walk) home when they ___ (see) a dog.", options: ["were walking / saw", "walked / saw", "were walking / were seeing"], answer: 0 },
+    { text: "While the teacher ___ (explain) the lesson, the students ___ (take) notes.", options: ["was explaining / were taking", "explained / took", "was explaining / took"], answer: 0 }
+  ];
 
-    function markKeywords(text) {
-      return text.replace(/\bwhen\b/gi, '<span class="k-when">$&</span>').replace(/\bwhile\b/gi, '<span class="k-while">$&</span>');
-    }
-    function notify(message, type = "info") {
-      const host = document.getElementById("toasts");
-      const toast = document.createElement("div");
-      toast.className = `toast ${type}`;
-      toast.textContent = message;
-      host.appendChild(toast);
-      requestAnimationFrame(() => toast.classList.add("show"));
-      setTimeout(() => {
-        toast.classList.remove("show");
-        setTimeout(() => toast.remove(), 260);
-      }, 2400);
-    }
-    function setTodayDate() { document.getElementById("studentDate").value = new Date().toISOString().slice(0, 10); }
-    function getAudioCtx() {
-      if (!audioCtxRef) {
-        const Ctx = window.AudioContext || window.webkitAudioContext;
-        if (!Ctx) return null;
-        audioCtxRef = new Ctx();
-      }
-      return audioCtxRef;
-    }
-    function playFile(path, volume = 0.6) {
-      if (!path) return false;
-      try {
-        const audio = new Audio(path);
-        audio.volume = volume;
-        audio.play().catch(() => {});
-        return true;
-      } catch (_) {
-        return false;
-      }
-    }
-    function tone(freq, duration = 0.1, type = "triangle", gain = 0.03, delay = 0) {
-      const ctx = getAudioCtx();
-      if (!ctx) return;
-      const osc = ctx.createOscillator();
-      const amp = ctx.createGain();
-      osc.type = type;
-      osc.frequency.value = freq;
-      amp.gain.value = 0;
-      osc.connect(amp);
-      amp.connect(ctx.destination);
-      const t = ctx.currentTime + delay;
-      amp.gain.linearRampToValueAtTime(gain, t + 0.01);
-      amp.gain.exponentialRampToValueAtTime(0.001, t + duration);
-      osc.start(t);
-      osc.stop(t + duration + 0.02);
-    }
-    function playSelectSound() {
-      if (playFile(SOUND_FILES.select, 0.35)) return;
-      tone(620, 0.06, "triangle", 0.02);
-      tone(760, 0.05, "triangle", 0.015, 0.05);
-    }
-    function playSubmitSound() {
-      if (playFile(SOUND_FILES.submit, 0.6)) return;
-      tone(523, 0.12, "triangle", 0.03);
-      tone(659, 0.12, "triangle", 0.03, 0.09);
-      tone(784, 0.15, "triangle", 0.034, 0.18);
-    }
-    function launchIntenseConfetti() {
-      if (typeof confetti !== "function") return;
-      const end = Date.now() + 2800;
-      (function frame() {
-        confetti({ particleCount: 22, angle: 60, spread: 82, origin: { x: 0 }, startVelocity: 58, scalar: 1.25 });
-        confetti({ particleCount: 22, angle: 120, spread: 82, origin: { x: 1 }, startVelocity: 58, scalar: 1.25 });
-        confetti({ particleCount: 16, spread: 120, origin: { x: Math.random(), y: Math.random() * 0.35 + 0.2 }, startVelocity: 50, scalar: 1.15 });
-        if (Date.now() < end) requestAnimationFrame(frame);
-      })();
-    }
+  const WRITING_CARDS = [
+    { id: "ex1", prompt: "playing a game / your mom call you", sample: "I was playing a game with my friends when my mom called me for dinner.", editable: false },
+    { id: "w2", prompt: "walking in the park / birds sing", editable: true },
+    { id: "w3", prompt: "cleaning the house / guests arrive", editable: true },
+    { id: "w4", prompt: "driving to work / the car break down", editable: true },
+    { id: "w5", prompt: "cleaning the house / your mother cook", editable: true },
+    { id: "w6", prompt: "studying for a test / your friend send a message", editable: true }
+  ];
 
-    function renderVerbInputs() {
-      const row = document.getElementById("verbRow");
-      row.innerHTML = Array.from({ length: 8 }, (_, i) => `<input id="verb-${i + 1}" class="verb-input" type="text" placeholder="......." />`).join("");
+  const state = {
+    selected: Array(QUESTIONS.length).fill(null),
+    answered: 0,
+    score: 0,
+    submitted: false
+  };
+
+  let audioCtxRef = null;
+
+  function markKeywords(text) {
+    return String(text)
+      .replace(/\bwhen\b/gi, '<span class="k-when">$&</span>')
+      .replace(/\bwhile\b/gi, '<span class="k-while">$&</span>');
+  }
+
+  function notify(message, type = "info") {
+    const host = document.getElementById("toasts");
+    const toast = document.createElement("div");
+    toast.className = `toast ${type}`;
+    toast.textContent = message;
+    host.appendChild(toast);
+
+    requestAnimationFrame(() => toast.classList.add("show"));
+
+    setTimeout(() => {
+      toast.classList.remove("show");
+      setTimeout(() => toast.remove(), 260);
+    }, 2600);
+  }
+
+  function setTodayDate() {
+    document.getElementById("studentDate").value = new Date().toISOString().slice(0, 10);
+  }
+
+  function getAudioCtx() {
+    if (!audioCtxRef) {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return null;
+      audioCtxRef = new Ctx();
     }
-    function renderQuiz() {
-      const box = document.getElementById("quiz");
-      box.innerHTML = "";
-      QUESTIONS.forEach((q, i) => {
-        const card = document.createElement("article");
-        card.className = "q-card";
-        card.dataset.i = i;
-        card.innerHTML = `<div class="q-title">${String.fromCharCode(65 + i)}. ${markKeywords(q.text)}</div><div class="opts">${q.options.map((option, oi) => `<button type="button" class="opt" data-oi="${oi}">${markKeywords(option)}</button>`).join("")}</div>`;
-        box.appendChild(card);
+    return audioCtxRef;
+  }
+
+  function playFile(path, volume = 0.6) {
+    if (!path) return false;
+    try {
+      const audio = new Audio(path);
+      audio.volume = volume;
+      audio.play().catch(() => {});
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function tone(freq, duration = 0.1, type = "triangle", gain = 0.03, delay = 0) {
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+
+    const osc = ctx.createOscillator();
+    const amp = ctx.createGain();
+
+    osc.type = type;
+    osc.frequency.value = freq;
+    amp.gain.value = 0;
+
+    osc.connect(amp);
+    amp.connect(ctx.destination);
+
+    const t = ctx.currentTime + delay;
+    amp.gain.linearRampToValueAtTime(gain, t + 0.01);
+    amp.gain.exponentialRampToValueAtTime(0.001, t + duration);
+
+    osc.start(t);
+    osc.stop(t + duration + 0.02);
+  }
+
+  function playSelectSound() {
+    if (playFile(SOUND_FILES.select, 0.35)) return;
+    tone(620, 0.06, "triangle", 0.02);
+    tone(760, 0.05, "triangle", 0.015, 0.05);
+  }
+
+  function playSubmitSound() {
+    if (playFile(SOUND_FILES.submit, 0.6)) return;
+    tone(523, 0.12, "triangle", 0.03);
+    tone(659, 0.12, "triangle", 0.03, 0.09);
+    tone(784, 0.15, "triangle", 0.034, 0.18);
+  }
+
+  function launchIntenseConfetti() {
+    if (typeof confetti !== "function") return;
+
+    const end = Date.now() + 2800;
+
+    (function frame() {
+      confetti({
+        particleCount: 22,
+        angle: 60,
+        spread: 82,
+        origin: { x: 0 },
+        startVelocity: 58,
+        scalar: 1.25
       });
-    }
-    function renderWritingCards() {
-      const box = document.getElementById("writing");
-      box.innerHTML = "";
-      WRITING_CARDS.forEach((cardData, i) => {
-        const card = document.createElement("article");
-        card.className = "w-card";
-        const imageSrc = (WRITING_IMAGE_SOURCES[i] || "").trim();
-        card.innerHTML = `<div class="pic"><img class="pic-img" alt="Picture ${i + 1}" /><span class="pic-fallback">Picture ${i + 1}</span></div>${cardData.editable ? "" : '<span class="tag">Example</span>'}<div class="prompt">${i + 1}. ${markKeywords(cardData.prompt)}</div>${cardData.editable ? `<textarea id="write-${cardData.id}" class="write-input" placeholder="Write your sentence here..."></textarea>` : `<p class="sample">${markKeywords(cardData.sample)}</p>`}`;
-        const img = card.querySelector(".pic-img");
-        const fallback = card.querySelector(".pic-fallback");
 
-        img.addEventListener("load", () => {
-          img.style.display = "block";
-          fallback.style.display = "none";
-        });
-        img.addEventListener("error", () => {
-          img.style.display = "none";
-          fallback.style.display = "grid";
-        });
+      confetti({
+        particleCount: 22,
+        angle: 120,
+        spread: 82,
+        origin: { x: 1 },
+        startVelocity: 58,
+        scalar: 1.25
+      });
 
-        function applyImage(src) {
-          const clean = (src || "").trim();
-          if (!clean) {
-            img.removeAttribute("src");
-            img.style.display = "none";
-            fallback.style.display = "grid";
-            return;
-          }
-          img.style.display = "block";
-          img.src = clean;
+      confetti({
+        particleCount: 16,
+        spread: 120,
+        origin: { x: Math.random(), y: Math.random() * 0.35 + 0.2 },
+        startVelocity: 50,
+        scalar: 1.15
+      });
+
+      if (Date.now() < end) requestAnimationFrame(frame);
+    })();
+  }
+
+  function renderVerbInputs() {
+    const row = document.getElementById("verbRow");
+    row.innerHTML = Array.from({ length: 8 }, (_, i) => {
+      return `<input id="verb-${i + 1}" class="verb-input" type="text" placeholder="......." />`;
+    }).join("");
+  }
+
+  function renderQuiz() {
+    const box = document.getElementById("quiz");
+    box.innerHTML = "";
+
+    QUESTIONS.forEach((q, i) => {
+      const card = document.createElement("article");
+      card.className = "q-card";
+      card.dataset.i = i;
+
+      card.innerHTML = `
+        <div class="q-title">${String.fromCharCode(65 + i)}. ${markKeywords(q.text)}</div>
+        <div class="opts">
+          ${q.options.map((option, oi) => `
+            <button type="button" class="opt" data-oi="${oi}">
+              ${markKeywords(option)}
+            </button>
+          `).join("")}
+        </div>
+      `;
+
+      box.appendChild(card);
+    });
+  }
+
+  function renderWritingCards() {
+    const box = document.getElementById("writing");
+    box.innerHTML = "";
+
+    WRITING_CARDS.forEach((cardData, i) => {
+      const card = document.createElement("article");
+      card.className = "w-card";
+
+      const imageSrc = (WRITING_IMAGE_SOURCES[i] || "").trim();
+
+      card.innerHTML = `
+        <div class="pic">
+          <img class="pic-img" alt="Picture ${i + 1}" />
+          <span class="pic-fallback">Picture ${i + 1}</span>
+        </div>
+        ${cardData.editable ? "" : '<span class="tag">Example</span>'}
+        <div class="prompt">${i + 1}. ${markKeywords(cardData.prompt)}</div>
+        ${
+          cardData.editable
+            ? `<textarea id="write-${cardData.id}" class="write-input" placeholder="Write your sentence here..."></textarea>`
+            : `<p class="sample">${markKeywords(cardData.sample)}</p>`
         }
+      `;
 
-        applyImage(imageSrc);
-        box.appendChild(card);
+      const img = card.querySelector(".pic-img");
+      const fallback = card.querySelector(".pic-fallback");
+
+      img.addEventListener("load", () => {
+        img.style.display = "block";
+        fallback.style.display = "none";
       });
-    }
-    function updateAnsweredDisplay() {
-      state.answered = state.selected.filter((v) => v !== null).length;
-      state.score = state.selected.reduce((sum, v, i) => (v === QUESTIONS[i].answer ? sum + 1 : sum), 0);
-      document.getElementById("answeredLive").textContent = `Answered: ${state.answered} / ${QUESTIONS.length}`;
-    }
-    function handleQuizClick(event) {
-      const btn = event.target.closest(".opt");
-      if (!btn) return;
-      if (state.submitted) {
-        notify("Worksheet already submitted.", "info");
-        return;
+
+      img.addEventListener("error", () => {
+        img.style.display = "none";
+        fallback.style.display = "grid";
+      });
+
+      if (imageSrc) {
+        img.src = imageSrc;
+      } else {
+        img.style.display = "none";
+        fallback.style.display = "grid";
       }
-      const card = btn.closest(".q-card");
-      const qIndex = Number(card.dataset.i);
-      const selected = Number(btn.dataset.oi);
-      card.querySelectorAll(".opt").forEach((opt) => opt.classList.remove("active"));
-      btn.classList.add("active");
-      state.selected[qIndex] = selected;
-      updateAnsweredDisplay();
-      playSelectSound();
-      
+
+      box.appendChild(card);
+    });
+  }
+
+  function updateAnsweredDisplay() {
+    state.answered = state.selected.filter(v => v !== null).length;
+    state.score = state.selected.reduce((sum, v, i) => {
+      return v === QUESTIONS[i].answer ? sum + 1 : sum;
+    }, 0);
+
+    document.getElementById("answeredLive").textContent =
+      `Answered: ${state.answered} / ${QUESTIONS.length}`;
+  }
+
+  function handleQuizClick(event) {
+    const btn = event.target.closest(".opt");
+    if (!btn) return;
+
+    if (state.submitted) {
+      notify("Worksheet already submitted.", "info");
+      return;
     }
-    function collectPayload() {
-      const writingAnswers = WRITING_CARDS.filter((item) => item.editable).map((item) => ({ prompt: item.prompt, answer: (document.getElementById(`write-${item.id}`)?.value || "").trim() }));
-      const activityA = Array.from({ length: 5 }, (_, i) => (document.getElementById(`a${i + 1}`)?.value || "").trim());
-      const activityB = Array.from({ length: 8 }, (_, i) => (document.getElementById(`verb-${i + 1}`)?.value || "").trim());
+
+    const card = btn.closest(".q-card");
+    const qIndex = Number(card.dataset.i);
+    const selected = Number(btn.dataset.oi);
+
+    card.querySelectorAll(".opt").forEach(opt => opt.classList.remove("active"));
+    btn.classList.add("active");
+
+    state.selected[qIndex] = selected;
+    updateAnsweredDisplay();
+    playSelectSound();
+  }
+
+  function collectPayload() {
+    const writingAnswers = WRITING_CARDS
+      .filter(item => item.editable)
+      .map(item => ({
+        prompt: item.prompt,
+        answer: (document.getElementById(`write-${item.id}`)?.value || "").trim()
+      }));
+
+    const activityA = Array.from({ length: 5 }, (_, i) => {
+      return (document.getElementById(`a${i + 1}`)?.value || "").trim();
+    });
+
+    const activityB = Array.from({ length: 8 }, (_, i) => {
+      return (document.getElementById(`verb-${i + 1}`)?.value || "").trim();
+    });
+
+    const percent = QUESTIONS.length > 0
+      ? Math.round((state.score / QUESTIONS.length) * 100)
+      : 0;
+
+    return {
+      timestamp: new Date().toISOString(),
+      student: {
+        name: document.getElementById("studentName").value.trim(),
+        classGrade: document.getElementById("studentClass").value.trim(),
+        date: document.getElementById("studentDate").value
+      },
+      quiz: {
+        score: state.score,
+        total: QUESTIONS.length,
+        answered: state.answered,
+        percent,
+        selections: state.selected
+      },
+      activityA,
+      activityB,
+      writingAnswers
+    };
+  }
+
+  function isAppsScriptUrlSet() {
+    const url = (APPS_SCRIPT_URL || "").trim();
+    return url &&
+      url !== "PASTE_YOUR_DEPLOYED_APPS_SCRIPT_EXEC_URL_HERE" &&
+      /^https:\/\/script\.google\.com\/macros\/s\/.+\/exec$/.test(url);
+  }
+
+  async function saveToSheets() {
+    if (!isAppsScriptUrlSet()) {
       return {
-        timestamp: new Date().toISOString(),
-        student: {
-          name: document.getElementById("studentName").value.trim(),
-          classGrade: document.getElementById("studentClass").value.trim(),
-          date: document.getElementById("studentDate").value
-        },
-        quiz: {
-          score: state.score,
-          total: QUESTIONS.length,
-          answered: state.answered,
-          percent: Math.round((state.score / QUESTIONS.length) * 100),
-          selections: state.selected
-        },
-        activityA,
-        activityB,
-        writingAnswers
+        ok: false,
+        error: "Google Apps Script URL is not set correctly."
       };
     }
-    async function saveToSheets(fromSubmit = false) {
-      if (APPS_SCRIPT_URL === "https://script.google.com/macros/s/AKfycbyXqhi5XcjAX4mRSep9hMB8vJLJSqcR5Y1r2VW3xAtLaTDxTzGS02eiyJy6TcdHoNdFxQ/exec") {
-        notify(fromSubmit ? "Submitted. Add your Google Apps Script URL to enable auto-save." : "Please set your Google Apps Script URL first.", "info");
-        return false;
-      }
+
+    try {
+      const response = await fetch(APPS_SCRIPT_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "text/plain;charset=utf-8"
+        },
+        body: JSON.stringify(collectPayload())
+      });
+
+      const text = await response.text();
+
+      let data = {};
       try {
-        const response = await fetch(APPS_SCRIPT_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(collectPayload())
-        });
-        if (!response.ok) throw new Error("Bad response");
-        notify("Submitted and saved to Google Sheets.", "success");
-        return true;
+        data = text ? JSON.parse(text) : {};
       } catch (_) {
-        notify("Save failed. Check URL, deployment, and CORS settings.", "error");
-        return false;
+        data = { ok: false, error: "Server returned invalid JSON." };
       }
-    }
-    function lockWorksheetAfterSubmit() {
-      document.querySelectorAll(".opt").forEach((opt) => { opt.disabled = true; });
-    }
-    function validateRequiredFields() {
-      const nameEl = document.getElementById("studentName");
-      const classEl = document.getElementById("studentClass");
-      if (!nameEl.value.trim() || !classEl.value.trim()) {
-        notify("Name and class are required.", "error");
-        if (!nameEl.value.trim()) nameEl.focus(); else classEl.focus();
-        return false;
+
+      if (!response.ok) {
+        return {
+          ok: false,
+          error: data.error || `HTTP ${response.status}`
+        };
       }
-      return true;
-    }
-    async function handleSubmit() {
-      if (state.submitted) {
-        notify("Worksheet already submitted.", "info");
-        return;
+
+      if (!data.ok) {
+        return {
+          ok: false,
+          error: data.error || "Save failed on the server."
+        };
       }
-      if (!validateRequiredFields()) return;
-      const submitBtn = document.getElementById("submitBtn");
-      submitBtn.disabled = true;
-      submitBtn.textContent = "Submitting...";
-      state.submitted = true;
-      updateAnsweredDisplay();
-      lockWorksheetAfterSubmit();
-      playSubmitSound();
-      launchIntenseConfetti();
-      await saveToSheets(true);
-      notify("Worksheet submitted.", "info");
-      submitBtn.textContent = "Submitted";
+
+      return {
+        ok: true,
+        rowNumber: data.rowNumber || ""
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        error: error && error.message ? error.message : "Network request failed."
+      };
     }
-    function init() {
-      setTodayDate();
-      renderVerbInputs();
-      renderQuiz();
-      renderWritingCards();
-      updateAnsweredDisplay();
-      document.getElementById("quiz").addEventListener("click", handleQuizClick);
-      document.getElementById("submitBtn").addEventListener("click", handleSubmit);
+  }
+
+  function lockWorksheetAfterSubmit() {
+    document.querySelectorAll(".opt").forEach(opt => {
+      opt.disabled = true;
+    });
+
+    document.querySelectorAll("textarea, input").forEach(el => {
+      if (
+        el.id !== "studentName" &&
+        el.id !== "studentClass" &&
+        el.id !== "studentDate"
+      ) {
+        el.disabled = true;
+      }
+    });
+  }
+
+  function validateRequiredFields() {
+    const nameEl = document.getElementById("studentName");
+    const classEl = document.getElementById("studentClass");
+
+    if (!nameEl.value.trim()) {
+      notify("Student name is required.", "error");
+      nameEl.focus();
+      return false;
     }
-    init();
-  </script>
+
+    if (!classEl.value.trim()) {
+      notify("Class / Grade is required.", "error");
+      classEl.focus();
+      return false;
+    }
+
+    return true;
+  }
+
+  async function handleSubmit() {
+    if (state.submitted) {
+      notify("Worksheet already submitted.", "info");
+      return;
+    }
+
+    if (!validateRequiredFields()) return;
+
+    updateAnsweredDisplay();
+
+    const submitBtn = document.getElementById("submitBtn");
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Submitting...";
+
+    const result = await saveToSheets();
+
+    if (!result.ok) {
+      notify(result.error || "Save failed. Check deployment and URL.", "error");
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Submit";
+      return;
+    }
+
+    state.submitted = true;
+    lockWorksheetAfterSubmit();
+    playSubmitSound();
+    launchIntenseConfetti();
+
+    notify(`Worksheet submitted and saved${result.rowNumber ? " (row " + result.rowNumber + ")" : ""}.`, "success");
+
+    submitBtn.textContent = "Submitted";
+  }
+
+  function init() {
+    setTodayDate();
+    renderVerbInputs();
+    renderQuiz();
+    renderWritingCards();
+    updateAnsweredDisplay();
+
+    document.getElementById("quiz").addEventListener("click", handleQuizClick);
+    document.getElementById("submitBtn").addEventListener("click", handleSubmit);
+  }
+
+  init();
+</script>
 </body>
 </html>
